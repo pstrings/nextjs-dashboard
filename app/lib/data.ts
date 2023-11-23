@@ -1,4 +1,4 @@
-import { sql } from '@vercel/postgres';
+import { sql } from "@vercel/postgres";
 import {
   CustomerField,
   CustomersTable,
@@ -7,8 +7,8 @@ import {
   LatestInvoiceRaw,
   User,
   Revenue,
-} from './definitions';
-import { formatCurrency } from './utils';
+} from "./definitions";
+import { formatCurrency } from "./utils";
 
 export async function fetchRevenue() {
   // Add noStore() here prevent the response from being cached.
@@ -21,24 +21,24 @@ export async function fetchRevenue() {
     // console.log('Fetching revenue data...');
     // await new Promise((resolve) => setTimeout(resolve, 3000));
 
-    const data = await sql<Revenue>`SELECT * FROM revenue`;
+    const data = await sql<Revenue>`SELECT * FROM nextjsdashboardrevenue`;
 
     // console.log('Data fetch complete after 3 seconds.');
 
     return data.rows;
   } catch (error) {
-    console.error('Database Error:', error);
-    throw new Error('Failed to fetch revenue data.');
+    console.error("Database Error:", error);
+    throw new Error("Failed to fetch revenue data.");
   }
 }
 
 export async function fetchLatestInvoices() {
   try {
     const data = await sql<LatestInvoiceRaw>`
-      SELECT invoices.amount, customers.name, customers.image_url, customers.email, invoices.id
-      FROM invoices
-      JOIN customers ON invoices.customer_id = customers.id
-      ORDER BY invoices.date DESC
+      SELECT nextjsdashboardinvoices.amount, nextjsdashboardcustomers.name, nextjsdashboardcustomers.image_url, nextjsdashboardcustomers.email, nextjsdashboardinvoices.id
+      FROM nextjsdashboardinvoices
+      JOIN nextjsdashboardcustomers ON nextjsdashboardinvoices.customer_id = nextjsdashboardcustomers.id
+      ORDER BY nextjsdashboardinvoices.date DESC
       LIMIT 5`;
 
     const latestInvoices = data.rows.map((invoice) => ({
@@ -47,8 +47,8 @@ export async function fetchLatestInvoices() {
     }));
     return latestInvoices;
   } catch (error) {
-    console.error('Database Error:', error);
-    throw new Error('Failed to fetch the latest invoices.');
+    console.error("Database Error:", error);
+    throw new Error("Failed to fetch the latest invoices.");
   }
 }
 
@@ -57,12 +57,12 @@ export async function fetchCardData() {
     // You can probably combine these into a single SQL query
     // However, we are intentionally splitting them to demonstrate
     // how to initialize multiple queries in parallel with JS.
-    const invoiceCountPromise = sql`SELECT COUNT(*) FROM invoices`;
-    const customerCountPromise = sql`SELECT COUNT(*) FROM customers`;
+    const invoiceCountPromise = sql`SELECT COUNT(*) FROM nextjsdashboardinvoices`;
+    const customerCountPromise = sql`SELECT COUNT(*) FROM nextjsdashboardcustomers`;
     const invoiceStatusPromise = sql`SELECT
          SUM(CASE WHEN status = 'paid' THEN amount ELSE 0 END) AS "paid",
          SUM(CASE WHEN status = 'pending' THEN amount ELSE 0 END) AS "pending"
-         FROM invoices`;
+         FROM nextjsdashboardinvoices`;
 
     const data = await Promise.all([
       invoiceCountPromise,
@@ -70,10 +70,10 @@ export async function fetchCardData() {
       invoiceStatusPromise,
     ]);
 
-    const numberOfInvoices = Number(data[0].rows[0].count ?? '0');
-    const numberOfCustomers = Number(data[1].rows[0].count ?? '0');
-    const totalPaidInvoices = formatCurrency(data[2].rows[0].paid ?? '0');
-    const totalPendingInvoices = formatCurrency(data[2].rows[0].pending ?? '0');
+    const numberOfInvoices = Number(data[0].rows[0].count ?? "0");
+    const numberOfCustomers = Number(data[1].rows[0].count ?? "0");
+    const totalPaidInvoices = formatCurrency(data[2].rows[0].paid ?? "0");
+    const totalPendingInvoices = formatCurrency(data[2].rows[0].pending ?? "0");
 
     return {
       numberOfCustomers,
@@ -82,65 +82,65 @@ export async function fetchCardData() {
       totalPendingInvoices,
     };
   } catch (error) {
-    console.error('Database Error:', error);
-    throw new Error('Failed to card data.');
+    console.error("Database Error:", error);
+    throw new Error("Failed to card data.");
   }
 }
 
 const ITEMS_PER_PAGE = 6;
 export async function fetchFilteredInvoices(
   query: string,
-  currentPage: number,
+  currentPage: number
 ) {
   const offset = (currentPage - 1) * ITEMS_PER_PAGE;
 
   try {
     const invoices = await sql<InvoicesTable>`
       SELECT
-        invoices.id,
-        invoices.amount,
-        invoices.date,
-        invoices.status,
-        customers.name,
-        customers.email,
-        customers.image_url
-      FROM invoices
-      JOIN customers ON invoices.customer_id = customers.id
+        nextjsdashboardinvoices.id,
+        nextjsdashboardinvoices.amount,
+        nextjsdashboardinvoices.date,
+        nextjsdashboardinvoices.status,
+        nextjsdashboardcustomers.name,
+        nextjsdashboardcustomers.email,
+        nextjsdashboardcustomers.image_url
+      FROM nextjsdashboardinvoices
+      JOIN nextjsdashboardcustomers ON nextjsdashboardinvoices.customer_id = nextjsdashboardcustomers.id
       WHERE
-        customers.name ILIKE ${`%${query}%`} OR
-        customers.email ILIKE ${`%${query}%`} OR
-        invoices.amount::text ILIKE ${`%${query}%`} OR
-        invoices.date::text ILIKE ${`%${query}%`} OR
-        invoices.status ILIKE ${`%${query}%`}
-      ORDER BY invoices.date DESC
+        nextjsdashboardcustomers.name ILIKE ${`%${query}%`} OR
+        nextjsdashboardcustomers.email ILIKE ${`%${query}%`} OR
+        nextjsdashboardinvoices.amount::text ILIKE ${`%${query}%`} OR
+        nextjsdashboardinvoices.date::text ILIKE ${`%${query}%`} OR
+        nextjsdashboardinvoices.status ILIKE ${`%${query}%`}
+      ORDER BY nextjsdashboardinvoices.date DESC
       LIMIT ${ITEMS_PER_PAGE} OFFSET ${offset}
     `;
 
     return invoices.rows;
   } catch (error) {
-    console.error('Database Error:', error);
-    throw new Error('Failed to fetch invoices.');
+    console.error("Database Error:", error);
+    throw new Error("Failed to fetch invoices.");
   }
 }
 
 export async function fetchInvoicesPages(query: string) {
   try {
     const count = await sql`SELECT COUNT(*)
-    FROM invoices
-    JOIN customers ON invoices.customer_id = customers.id
+    FROM nextjsdashboardinvoices
+    JOIN nextjsdashboardcustomers ON nextjsdashboardinvoices.customer_id = nextjsdashboardcustomers.id
     WHERE
-      customers.name ILIKE ${`%${query}%`} OR
-      customers.email ILIKE ${`%${query}%`} OR
-      invoices.amount::text ILIKE ${`%${query}%`} OR
-      invoices.date::text ILIKE ${`%${query}%`} OR
-      invoices.status ILIKE ${`%${query}%`}
+      nextjsdashboardcustomers.name ILIKE ${`%${query}%`} OR
+      nextjsdashboardcustomers.email ILIKE ${`%${query}%`} OR
+      nextjsdashboardinvoices.amount::text ILIKE ${`%${query}%`} OR
+      nextjsdashboardinvoices.date::text ILIKE ${`%${query}%`} OR
+      nextjsdashboardinvoices.status ILIKE ${`%${query}%`}
   `;
 
     const totalPages = Math.ceil(Number(count.rows[0].count) / ITEMS_PER_PAGE);
     return totalPages;
   } catch (error) {
-    console.error('Database Error:', error);
-    throw new Error('Failed to fetch total number of invoices.');
+    console.error("Database Error:", error);
+    throw new Error("Failed to fetch total number of invoices.");
   }
 }
 
@@ -148,12 +148,12 @@ export async function fetchInvoiceById(id: string) {
   try {
     const data = await sql<InvoiceForm>`
       SELECT
-        invoices.id,
-        invoices.customer_id,
-        invoices.amount,
-        invoices.status
-      FROM invoices
-      WHERE invoices.id = ${id};
+        nextjsdashboardinvoices.id,
+        nextjsdashboardinvoices.customer_id,
+        nextjsdashboardinvoices.amount,
+        nextjsdashboardinvoices.status
+      FROM nextjsdashboardinvoices
+      WHERE nextjsdashboardinvoices.id = ${id};
     `;
 
     const invoice = data.rows.map((invoice) => ({
@@ -164,8 +164,8 @@ export async function fetchInvoiceById(id: string) {
 
     return invoice[0];
   } catch (error) {
-    console.error('Database Error:', error);
-    throw new Error('Failed to fetch invoice.');
+    console.error("Database Error:", error);
+    throw new Error("Failed to fetch invoice.");
   }
 }
 
@@ -175,15 +175,15 @@ export async function fetchCustomers() {
       SELECT
         id,
         name
-      FROM customers
+      FROM nextjsdashboardcustomers
       ORDER BY name ASC
     `;
 
     const customers = data.rows;
     return customers;
   } catch (err) {
-    console.error('Database Error:', err);
-    throw new Error('Failed to fetch all customers.');
+    console.error("Database Error:", err);
+    throw new Error("Failed to fetch all customers.");
   }
 }
 
@@ -191,20 +191,20 @@ export async function fetchFilteredCustomers(query: string) {
   try {
     const data = await sql<CustomersTable>`
 		SELECT
-		  customers.id,
-		  customers.name,
-		  customers.email,
-		  customers.image_url,
-		  COUNT(invoices.id) AS total_invoices,
-		  SUM(CASE WHEN invoices.status = 'pending' THEN invoices.amount ELSE 0 END) AS total_pending,
-		  SUM(CASE WHEN invoices.status = 'paid' THEN invoices.amount ELSE 0 END) AS total_paid
-		FROM customers
-		LEFT JOIN invoices ON customers.id = invoices.customer_id
+		  nextjsdashboardcustomers.id,
+		  nextjsdashboardcustomers.name,
+		  nextjsdashboardcustomers.email,
+		  nextjsdashboardcustomers.image_url,
+		  COUNT(nextjsdashboardinvoices.id) AS total_invoices,
+		  SUM(CASE WHEN nextjsdashboardinvoices.status = 'pending' THEN nextjsdashboardinvoices.amount ELSE 0 END) AS total_pending,
+		  SUM(CASE WHEN nextjsdashboardinvoices.status = 'paid' THEN nextjsdashboardinvoices.amount ELSE 0 END) AS total_paid
+		FROM nextjsdashboardcustomers
+		LEFT JOIN nextjsdashboardinvoices ON nextjsdashboardcustomers.id = nextjsdashboardinvoices.customer_id
 		WHERE
-		  customers.name ILIKE ${`%${query}%`} OR
-        customers.email ILIKE ${`%${query}%`}
-		GROUP BY customers.id, customers.name, customers.email, customers.image_url
-		ORDER BY customers.name ASC
+		  nextjsdashboardcustomers.name ILIKE ${`%${query}%`} OR
+        nextjsdashboardcustomers.email ILIKE ${`%${query}%`}
+		GROUP BY nextjsdashboardcustomers.id, nextjsdashboardcustomers.name, nextjsdashboardcustomers.email, nextjsdashboardcustomers.image_url
+		ORDER BY nextjsdashboardcustomers.name ASC
 	  `;
 
     const customers = data.rows.map((customer) => ({
@@ -215,17 +215,18 @@ export async function fetchFilteredCustomers(query: string) {
 
     return customers;
   } catch (err) {
-    console.error('Database Error:', err);
-    throw new Error('Failed to fetch customer table.');
+    console.error("Database Error:", err);
+    throw new Error("Failed to fetch customer table.");
   }
 }
 
 export async function getUser(email: string) {
   try {
-    const user = await sql`SELECT * FROM users WHERE email=${email}`;
+    const user =
+      await sql`SELECT * FROM nextjsdashboarduser WHERE email=${email}`;
     return user.rows[0] as User;
   } catch (error) {
-    console.error('Failed to fetch user:', error);
-    throw new Error('Failed to fetch user.');
+    console.error("Failed to fetch user:", error);
+    throw new Error("Failed to fetch user.");
   }
 }
